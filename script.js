@@ -4,7 +4,7 @@
 // ============================================================
 
 // 請把下面這一行換成你自己部署的 Apps Script 網頁應用程式網址（結尾是 /exec）
-const API_BASE_URL = 'PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE';
+const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbz7shdR3XCbLuklYsnKAnSjtinQ7F6tcj1Il1B9fRWig3BNy8AYzrU8Q42icyIRe-tOYA/exec';
 
 async function callApi(action, payload) {
   const res = await fetch(API_BASE_URL, {
