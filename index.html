@@ -187,7 +187,6 @@
 
   <div class="mode-switch">
     <button class="mode-btn active" id="btnModeEmpQuery" onclick="switchMode('emp-query')"><span class="tile-icon">◎</span>員工查詢</button>
-    <button class="mode-btn" id="btnModeEmpApply" onclick="switchMode('emp-apply')"><span class="tile-icon">✎</span>請假申請</button>
     <button class="mode-btn" id="btnModeNewHire" onclick="switchMode('newhire')"><span class="tile-icon">＋</span>新進員工資料填寫</button>
     <button class="mode-btn" id="btnModeAdmin" onclick="switchMode('admin')"><span class="tile-icon">▤</span>HR‧主管後台</button>
   </div>
@@ -297,7 +296,7 @@
       <div class="section-title">備注</div>
       <textarea id="n_note" placeholder="其他備註事項"></textarea>
 
-      <button class="primary" onclick="doSubmitNewHire()">送出資料</button>
+      <button class="primary" onclick="doSubmitNewHire(this)">送出資料</button>
       <div id="newHireMsg"></div>
     </div>
   </div>
@@ -309,11 +308,13 @@
       <h2>管理者登入</h2>
       <label>管理者 Email（需在白名單內）</label>
       <input id="adminEmail" placeholder="hr@company.com">
-      <button class="primary" onclick="doAdminLogin()">登入</button>
+      <button class="primary" onclick="doAdminLogin(this)">登入</button>
       <div id="adminLoginMsg"></div>
     </div>
 
     <div id="adminDashboard" style="display:none;">
+      <p class="hint" id="adminWelcome" style="margin-bottom:14px;"></p>
+
       <div class="card">
         <h2>LINE 通知綁定</h2>
         <p class="hint">綁定後，有新的請假申請時會透過 LINE 通知您（跟 Email 通知同時發送）。</p>
@@ -410,7 +411,7 @@
           <div class="section-title">備注</div>
           <textarea id="f_note" placeholder="其他備註事項"></textarea>
 
-          <button class="primary" onclick="doAddEmployee()">新增員工</button>
+          <button class="primary" onclick="doAddEmployee(this)">新增員工</button>
           <div id="addEmpMsg"></div>
         </div>
       </div>
@@ -418,7 +419,9 @@
       <div class="tab-content" id="tabList">
         <div class="card">
           <h2>員工總覽</h2>
-          <p class="hint">此表僅顯示常用欄位；完整人事資料（身份證字號、地址、緊急聯絡人等）請直接開啟「員工資料」試算表分頁查看。</p>
+          <p class="hint">此表僅顯示常用欄位；完整人事資料（身份證字號、地址、緊急聯絡人等）請直接開啟「員工資料」試算表分頁查看。特休天數/已用/剩餘天數也會自動同步寫入試算表最後幾欄，方便直接在 Sheet 上查看。</p>
+          <button class="ghost" onclick="doSyncAllLeaveStats()">同步全部員工的特休數據到試算表</button>
+          <div id="syncStatsMsg"></div>
           <div class="table-scroll" id="empListWrap"><div class="empty">載入中…</div></div>
         </div>
       </div>
@@ -524,7 +527,7 @@
           <div class="section-title">備注</div>
           <textarea id="e_note"></textarea>
 
-          <button class="primary" onclick="doUpdateEmployee()">儲存變更</button>
+          <button class="primary" onclick="doUpdateEmployee(this)">儲存變更</button>
           <div id="updateEmpMsg"></div>
         </div>
       </div>
