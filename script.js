@@ -4,7 +4,7 @@
 // ============================================================
 
 // 請把下面這一行換成你自己部署的 Apps Script 網頁應用程式網址（結尾是 /exec）
-const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbz7shdR3XCbLuklYsnKAnSjtinQ7F6tcj1Il1B9fRWig3BNy8AYzrU8Q42icyIRe-tOYA/exec';
+const API_BASE_URL = 'PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE';
 
 async function callApi(action, payload) {
   const res = await fetch(API_BASE_URL, {
@@ -23,16 +23,15 @@ let EMP_TARGET_TAB = 'empTabQuery';
 const OTHER_LEAVE_TYPES = ['事假','病假','婚假','喪假','產假'];
 
 function switchMode(mode){
-  const isEmp = (mode === 'emp-query' || mode === 'emp-apply');
+  const isEmp = (mode === 'emp-query');
   document.getElementById('panelEmp').classList.toggle('active', isEmp);
   document.getElementById('panelNewHire').classList.toggle('active', mode==='newhire');
   document.getElementById('panelAdmin').classList.toggle('active', mode==='admin');
   document.getElementById('btnModeEmpQuery').classList.toggle('active', mode==='emp-query');
-  document.getElementById('btnModeEmpApply').classList.toggle('active', mode==='emp-apply');
   document.getElementById('btnModeNewHire').classList.toggle('active', mode==='newhire');
   document.getElementById('btnModeAdmin').classList.toggle('active', mode==='admin');
   if(isEmp){
-    EMP_TARGET_TAB = (mode === 'emp-apply') ? 'empTabApply' : 'empTabQuery';
+    EMP_TARGET_TAB = 'empTabQuery';
     if(CURRENT_EMPLOYEE) switchEmpTab(EMP_TARGET_TAB);
   }
 }
@@ -40,6 +39,18 @@ function switchMode(mode){
 function switchEmpTab(tab){
   document.querySelectorAll('#empDashboard .tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
   document.querySelectorAll('#empDashboard .tab-content').forEach(c=>c.classList.toggle('active', c.id===tab));
+}
+
+function setBtnBusy(btn, busy, busyText){
+  if(!btn) return;
+  if(busy){
+    if(btn.dataset.originalText === undefined) btn.dataset.originalText = btn.textContent;
+    btn.textContent = busyText || '處理中…';
+    btn.disabled = true;
+  } else {
+    btn.disabled = false;
+    if(btn.dataset.originalText !== undefined) btn.textContent = btn.dataset.originalText;
+  }
 }
 
 function showMsg(elId, text, ok){
@@ -126,7 +137,7 @@ function renderEmpDashboard(emp, leave){
       '<div><label>結束日</label><input type="date" id="reqEnd"></div>' +
     '</div>' +
     '<label>事由（選填）</label><textarea id="reqReason" placeholder="例如：家庭旅遊"></textarea>' +
-    '<button class="primary" onclick="doSubmitLeave()">送出申請</button>' +
+    '<button class="primary" onclick="doSubmitLeave(this)">送出申請</button>' +
     '<p class="hint">特休／事假／病假會依剩餘天數自動檢查；婚假／喪假／產假天數僅供參考，交由主管審核判斷。</p>' +
     '<div id="submitLeaveMsg"></div>' +
     '</div>' +
@@ -222,13 +233,15 @@ function onLeaveTypeChange(){
     .catch(function(err){ el.innerHTML = '<div class="msg error">'+(err.message||err)+'</div>'; });
 }
 
-function doSubmitLeave(){
+function doSubmitLeave(btn){
+  if(btn && btn.disabled) return;
   const leaveType = document.getElementById('reqLeaveType').value;
   const startDate = document.getElementById('reqStart').value;
   const endDate = document.getElementById('reqEnd').value;
   const reason = document.getElementById('reqReason').value;
   if(!startDate || !endDate){ showMsg('submitLeaveMsg','請選擇開始與結束日期。', false); return; }
 
+  setBtnBusy(btn, true, '送出中…');
   callApi('submitLeaveRequest', {
     nationalId: CURRENT_EMPLOYEE.nationalId,
     name: CURRENT_EMPLOYEE.name,
@@ -238,6 +251,7 @@ function doSubmitLeave(){
     reason: reason
   })
     .then(function(res){
+      setBtnBusy(btn, false);
       showMsg('submitLeaveMsg', '申請已送出（'+res.days+' 天），等待審核。', true);
       return callApi('getLeaveSummary', { nationalId: CURRENT_EMPLOYEE.nationalId });
     })
@@ -247,7 +261,7 @@ function doSubmitLeave(){
       document.getElementById('reqLeaveType').value = leaveType;
       onLeaveTypeChange();
     })
-    .catch(function(err){ showMsg('submitLeaveMsg', err.message || String(err), false); });
+    .catch(function(err){ setBtnBusy(btn, false); showMsg('submitLeaveMsg', err.message || String(err), false); });
 }
 
 function loadMyLeaveRequests(){
@@ -268,7 +282,8 @@ function loadMyLeaveRequests(){
 }
 
 /* ---------------- 新進員工資料填寫 ---------------- */
-function doSubmitNewHire(){
+function doSubmitNewHire(btn){
+  if(btn && btn.disabled) return;
   const payload = {
     branch: nval('n_branch'),
     employeeType: nval('n_employeeType'),
@@ -297,31 +312,37 @@ function doSubmitNewHire(){
     account: nval('n_account'),
     email: nval('n_email')
   };
+  setBtnBusy(btn, true, '送出中…');
   callApi('submitNewHireForm', payload)
     .then(function(res){
+      setBtnBusy(btn, false);
       showMsg('newHireMsg', '資料已送出（提交編號：'+res.submissionId+'），請等候人資審核建立。', true);
       document.querySelectorAll('#panelNewHire input, #panelNewHire select, #panelNewHire textarea').forEach(el=>el.value='');
     })
-    .catch(function(err){ showMsg('newHireMsg', err.message || String(err), false); });
+    .catch(function(err){ setBtnBusy(btn, false); showMsg('newHireMsg', err.message || String(err), false); });
 }
 
 function nval(id){ return document.getElementById(id).value; }
 
 /* ---------------- HR / 主管後台 ---------------- */
-function doAdminLogin(){
+function doAdminLogin(btn){
+  if(btn && btn.disabled) return;
   const email = document.getElementById('adminEmail').value.trim();
+  setBtnBusy(btn, true, '登入中…');
   callApi('adminLogin', { email: email })
     .then(function(res){
+      setBtnBusy(btn, false);
       if(!res.success){ showMsg('adminLoginMsg', res.message, false); return; }
       ADMIN_TOKEN = res.token;
       document.getElementById('adminLoginCard').style.display = 'none';
       document.getElementById('adminDashboard').style.display = 'block';
+      document.getElementById('adminWelcome').textContent = '您好，' + (res.name || res.email) + '（審核紀錄會用這個名稱記錄）';
       loadEmployeeList();
       loadPendingRequests();
       loadPendingNewHires();
       identifyOneSignalHR_();
     })
-    .catch(function(err){ showMsg('adminLoginMsg', err.message || String(err), false); });
+    .catch(function(err){ setBtnBusy(btn, false); showMsg('adminLoginMsg', err.message || String(err), false); });
 }
 
 /* ---------------- OneSignal 推播訂閱設定 ---------------- */
@@ -360,7 +381,8 @@ function switchAdminTab(tab){
   if(tab==='tabNewHire') loadPendingNewHires();
 }
 
-function doAddEmployee(){
+function doAddEmployee(btn){
+  if(btn && btn.disabled) return;
   const payload = {
     token: ADMIN_TOKEN,
     branch: val('f_branch'),
@@ -390,16 +412,28 @@ function doAddEmployee(){
     account: val('f_account'),
     email: val('f_email')
   };
+  setBtnBusy(btn, true, '新增中…');
   callApi('addEmployee', payload)
     .then(function(res){
+      setBtnBusy(btn, false);
       showMsg('addEmpMsg', '新增成功！身份證字號：' + res.nationalId, true);
       document.querySelectorAll('#tabAdd input, #tabAdd select, #tabAdd textarea').forEach(el=>el.value='');
       loadEmployeeList();
     })
-    .catch(function(err){ showMsg('addEmpMsg', err.message || String(err), false); });
+    .catch(function(err){ setBtnBusy(btn, false); showMsg('addEmpMsg', err.message || String(err), false); });
 }
 
 function val(id){ return document.getElementById(id).value; }
+
+function doSyncAllLeaveStats(){
+  document.getElementById('syncStatsMsg').innerHTML = '<div class="empty">同步中…</div>';
+  callApi('syncAllLeaveStats', { token: ADMIN_TOKEN })
+    .then(function(res){
+      showMsg('syncStatsMsg', '已同步 ' + res.count + ' 位員工的特休數據。', true);
+      loadEmployeeList();
+    })
+    .catch(function(err){ showMsg('syncStatsMsg', err.message || String(err), false); });
+}
 
 function loadEmployeeList(){
   if(!ADMIN_TOKEN) return;
@@ -457,7 +491,8 @@ function openEmployeeDetail(nationalId){
     });
 }
 
-function doUpdateEmployee(){
+function doUpdateEmployee(btn){
+  if(btn && btn.disabled) return;
   const payload = {
     token: ADMIN_TOKEN,
     originalNationalId: val('e_originalNationalId'),
@@ -488,12 +523,14 @@ function doUpdateEmployee(){
     account: val('e_account'),
     email: val('e_email')
   };
+  setBtnBusy(btn, true, '儲存中…');
   callApi('updateEmployee', payload)
     .then(function(res){
+      setBtnBusy(btn, false);
       showMsg('updateEmpMsg', '已儲存變更。', true);
       openEmployeeDetail(res.nationalId);
     })
-    .catch(function(err){ showMsg('updateEmpMsg', err.message || String(err), false); });
+    .catch(function(err){ setBtnBusy(btn, false); showMsg('updateEmpMsg', err.message || String(err), false); });
 }
 
 function loadPendingRequests(){
@@ -505,8 +542,8 @@ function loadPendingRequests(){
       let html = '<table><thead><tr><th>申請編號</th><th>員工</th><th>假別</th><th>期間</th><th>天數</th><th>事由</th><th>操作</th></tr></thead><tbody>';
       list.forEach(r=>{
         html += '<tr><td>'+r.requestId+'</td><td>'+r.name+' ('+r.nationalId+')</td><td>'+(r.leaveType||'特休')+'</td><td>'+r.startDate+' ~ '+r.endDate+'</td><td>'+r.days+'</td><td>'+(r.reason||'-')+'</td>' +
-                '<td><button class="small-approve" onclick="doReview(\''+r.requestId+'\',\'approve\')">核准</button>' +
-                '<button class="small-reject" onclick="doReview(\''+r.requestId+'\',\'reject\')">拒絕</button></td></tr>';
+                '<td><button class="small-approve" onclick="doReview(\''+r.requestId+'\',\'approve\',this)">核准</button>' +
+                '<button class="small-reject" onclick="doReview(\''+r.requestId+'\',\'reject\',this)">拒絕</button></td></tr>';
       });
       html += '</tbody></table>';
       el.innerHTML = html;
@@ -514,14 +551,16 @@ function loadPendingRequests(){
     .catch(function(err){ document.getElementById('pendingWrap').innerHTML = '<div class="msg error">'+(err.message||err)+'</div>'; });
 }
 
-function doReview(requestId, decision){
+function doReview(requestId, decision, btn){
+  if(btn && btn.disabled) return;
   let rejectReason = '';
   if(decision === 'reject'){
     rejectReason = prompt('請輸入拒絕原因（選填）：') || '';
   }
+  if(btn) setBtnBusy(btn, true, '處理中…');
   callApi('reviewLeaveRequest', { token: ADMIN_TOKEN, requestId: requestId, decision: decision, rejectReason: rejectReason })
     .then(function(){ loadPendingRequests(); loadEmployeeList(); })
-    .catch(function(err){ alert(err.message || err); });
+    .catch(function(err){ if(btn) setBtnBusy(btn, false); alert(err.message || err); });
 }
 
 function loadPendingNewHires(){
@@ -533,8 +572,8 @@ function loadPendingNewHires(){
       let html = '<table><thead><tr><th>提交編號</th><th>姓名</th><th>身份證字號</th><th>店點</th><th>職位</th><th>到職日</th><th>手機</th><th>操作</th></tr></thead><tbody>';
       list.forEach(r=>{
         html += '<tr><td>'+r.submissionId+'</td><td>'+r.name+'</td><td>'+r.nationalId+'</td><td>'+(r.branch||'-')+'</td><td>'+(r.position||'-')+'</td><td>'+r.hireDate+'</td><td>'+(r.mobilePhone||'-')+'</td>' +
-                '<td><button class="small-approve" onclick="doReviewNewHire(\''+r.submissionId+'\',\'approve\')">核准建立</button>' +
-                '<button class="small-reject" onclick="doReviewNewHire(\''+r.submissionId+'\',\'reject\')">忽略</button></td></tr>';
+                '<td><button class="small-approve" onclick="doReviewNewHire(\''+r.submissionId+'\',\'approve\',this)">核准建立</button>' +
+                '<button class="small-reject" onclick="doReviewNewHire(\''+r.submissionId+'\',\'reject\',this)">忽略</button></td></tr>';
       });
       html += '</tbody></table>';
       el.innerHTML = html;
@@ -542,12 +581,14 @@ function loadPendingNewHires(){
     .catch(function(err){ document.getElementById('newHirePendingWrap').innerHTML = '<div class="msg error">'+(err.message||err)+'</div>'; });
 }
 
-function doReviewNewHire(submissionId, decision){
+function doReviewNewHire(submissionId, decision, btn){
+  if(btn && btn.disabled) return;
   if(decision === 'reject' && !confirm('確定要忽略這筆新進員工提交嗎？')) return;
   const action = decision === 'approve' ? 'approveNewHire' : 'rejectNewHire';
+  if(btn) setBtnBusy(btn, true, '處理中…');
   callApi(action, { token: ADMIN_TOKEN, submissionId: submissionId })
     .then(function(){ loadPendingNewHires(); loadEmployeeList(); })
-    .catch(function(err){ alert(err.message || err); });
+    .catch(function(err){ if(btn) setBtnBusy(btn, false); alert(err.message || err); });
 }
 
 // ---------- Service Worker 註冊（讓網頁可以離線快取外觀、支援加入主畫面）----------
