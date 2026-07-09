@@ -1,18 +1,27 @@
 // ============================================================
 // 特休假管理系統 - PWA 版前端邏輯
-// 透過 fetch() 呼叫 Apps Script 的 doPost API，取代 google.script.run
+// 透過 fetch() 呼叫 Apps Script 的 doGet API，取代 google.script.run
+//
+// 這裡刻意用 GET 而不是 POST：Google Apps Script 對 POST 請求固定會回傳 302 轉址，
+// 瀏覽器 fetch() 跟隨這個轉址時，有時會把 POST 降級成 GET，導致資料遺失、拿到 HTML 而不是 JSON。
+// GET 請求不會有這個問題，是官方文件示範中唯一穩定可靠的模式。
 // ============================================================
 
 // 請把下面這一行換成你自己部署的 Apps Script 網頁應用程式網址（結尾是 /exec）
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbz7shdR3XCbLuklYsnKAnSjtinQ7F6tcj1Il1B9fRWig3BNy8AYzrU8Q42icyIRe-tOYA/exec';
 
 async function callApi(action, payload) {
-  const res = await fetch(API_BASE_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 用 text/plain 避開 CORS 預檢請求
-    body: JSON.stringify({ action: action, payload: payload || {} })
-  });
-  const json = await res.json();
+  const url = API_BASE_URL
+    + '?action=' + encodeURIComponent(action)
+    + '&payload=' + encodeURIComponent(JSON.stringify(payload || {}));
+  const res = await fetch(url, { method: 'GET' });
+  const text = await res.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch (e) {
+    throw new Error('伺服器回應格式錯誤（可能是 Apps Script 網址或部署設定不正確）：' + text.slice(0, 200));
+  }
   if (!json.success) throw new Error(json.error || '發生未知錯誤');
   return json.data;
 }
